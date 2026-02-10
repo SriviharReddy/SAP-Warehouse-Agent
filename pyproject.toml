@@ -1,0 +1,18 @@
+[project]
+name = "my-agent"
+version = "0.1.0"
+description = "SAP LangGraph Agent MVP"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "langchain",
+    "langgraph",
+    "langgraph-checkpoint-sqlite",
+    "langchain-deepseek",
+    "streamlit",
+    "python-dotenv",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
