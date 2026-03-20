@@ -1,72 +1,87 @@
-# SAP Warehouse AI Assistant
+# 📦 SAP Warehouse AI Cockpit
 
-A conversational assistant for querying SAP Warehouse Management (WM) systems using natural language. Built with LangGraph for agent orchestration and Streamlit for the UI.
+An intelligent, conversational dashboard providing natural language access to SAP Warehouse Management (WM) systems. Powered by DeepSeek V4 and LangGraph, the assistant allows warehouse managers and operators to query inventory levels, storage parameters, shipping schedules, and picking tasks in real time.
 
-## Features
+---
 
-- **Natural language queries** over warehouse data — inventory, storage bins, inbound deliveries, outbound orders, and picking tasks
-- **Conversation history** with a sidebar listing past chats (named after the first message) and a "New Chat" button
-- **Tool call transparency** — each SAP API call is shown in an expandable log within the chat
-- **Persistent state** — conversations are stored in a local SQLite database across sessions
+## ✨ Core Features
 
-## SAP Integration Tools (Read-Only)
+*   **Natural Language SAP Queries**: Instant query access to stock levels, bin configurations, inbound freight, outbound orders, and picking status.
+*   **Chat History**: A sidebar for managing multiple conversation threads. The first user query is used as the conversation title.
+*   **Tool Call Logs**: Expandable JSON payloads showing the real-time response from each SAP tool call.
+*   **Durable State Persistence**: Asynchronous SQLite checkpointing keeps conversation state across sessions.
 
-All tools are query-only and do not modify warehouse state:
+---
 
-| Tool | Description |
-|------|-------------|
-| `get_stock_level` | Current stock quantity, unit of measure, and bin assignment for a material |
-| `get_storage_bin_info` | Bin capacity, utilization, environmental type, and active SKUs |
-| `list_inbound_deliveries` | Scheduled inbound shipments with carrier, ETA, and status |
-| `get_inbound_delivery_details` | Line items, quantities, supplier, and receiving dock for a delivery |
-| `list_outbound_orders` | Outbound shipping orders pending picking and packing |
-| `get_outbound_order_details` | Customer, route, priority, and line items for an outbound order |
-| `get_picking_task_details` | Assigned picker, staging area, item list, and progress for a task |
+## 🛠️ SAP Warehouse Integration APIs
 
-## Tech Stack
+The Cockpit is built on top of 7 asynchronous, read-only query tools:
 
-- **Agent**: [LangGraph](https://github.com/langchain-ai/langgraph) with `AsyncSqliteSaver` for durable state
-- **LLM**: DeepSeek V4 via `langchain-deepseek`
-- **UI**: [Streamlit](https://streamlit.io/)
-- **Package manager**: [`uv`](https://github.com/astral-sh/uv)
+1.  **`get_stock_level`**: Retrieves current material stock numbers, units of measure, and active storage bin assignments.
+2.  **`get_storage_bin_info`**: Inspects bin capacities, current utilization rates, environmental constraints (e.g., Ambient vs. Cold Storage), and active SKUs in the bin.
+3.  **`list_inbound_deliveries`**: Lists expected daily freight shipments, carriers, ETAs, and status.
+4.  **`get_inbound_delivery_details`**: Resolves line-items, quantities, supplier names, receiving docks, and handling instructions for an inbound delivery.
+5.  **`list_outbound_orders`**: Lists pending outbound shipping orders scheduled for picking and packing.
+6.  **`get_outbound_order_details`**: Resolves customer destinations, shipping routes, priority status, and line-item details for outbound orders.
+7.  **`get_picking_task_details`**: Returns assigned pickers, target staging areas, item lists, and active progress status for picking operations.
 
-## Project Structure
+---
+
+## 🏗️ Technical Stack & Architecture
+
+*   **Orchestration Framework**: LangGraph / LangChain (for graph execution and state checkpointing)
+*   **Language Model**: DeepSeek V4 via `langchain-deepseek`
+*   **Persistence Layer**: Async SQLite Checkpointer (`AsyncSqliteSaver`)
+*   **Frontend**: Streamlit
+*   **Package Manager**: `uv`
+
+---
+
+## 📂 Project Structure
 
 ```
 .
-├── my_agent/
-│   ├── agent.py          # Agent graph definition
+├── my_agent/                 # Core Agent Package
+│   ├── __init__.py
+│   ├── agent.py              # Compiled agent graph
 │   └── utils/
-│       ├── tools.py      # SAP query tools
-│       ├── nodes.py      # Graph nodes
-│       └── state.py      # State schema
-├── app.py                # Streamlit UI
-├── .env                  # Environment variables (not committed)
-├── pyproject.toml        # Dependencies
-└── langgraph.json        # LangGraph CLI config
+│       ├── __init__.py
+│       ├── tools.py          # 7 read-only SAP tools
+│       ├── nodes.py          # Graph nodes
+│       └── state.py          # State TypedDict schema
+├── app.py                    # Streamlit UI
+├── .env                      # Environment variables (not committed)
+├── .gitignore
+├── langgraph.json            # LangGraph CLI config
+├── pyproject.toml            # Project dependencies
+└── README.md
 ```
 
-## Setup
+---
 
-**1. Install dependencies**
+## 🚦 Installation & Setup
+
+### 1. Install dependencies
 
 ```bash
 uv sync
 ```
 
-**2. Configure environment variables**
+### 2. Configure environment variables
 
 Create a `.env` file in the project root:
 
 ```env
-DEEPSEEK_API_KEY=your_api_key_here
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
 LANGGRAPH_STRICT_MSGPACK=true
 ```
 
-**3. Run the app**
+---
+
+## 🏃 Running the App
 
 ```bash
 uv run streamlit run app.py
 ```
 
-The app will open at `http://localhost:8501`.
+Opens at `http://localhost:8501`.
