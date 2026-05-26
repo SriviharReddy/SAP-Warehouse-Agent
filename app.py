@@ -11,6 +11,7 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 import streamlit as st
 
 from my_agent.agent import get_agent
+from auth.ui import render_auth_gate
 
 # Load environment variables
 load_dotenv()
@@ -24,6 +25,10 @@ st.set_page_config(
     layout="wide",
 )
 
+# AUTH GATE — must be called before any other UI renders.
+# Returns the logged-in user's email, or renders login/signup and halts.
+current_user = render_auth_gate()
+
 # Warn if API key is missing
 if not os.getenv("DEEPSEEK_API_KEY") or os.getenv("DEEPSEEK_API_KEY") == "your_deepseek_api_key_here":
     st.warning("⚠️ DEEPSEEK_API_KEY is not configured in .env! Please set it before chatting.")
@@ -33,16 +38,22 @@ if not os.getenv("DEEPSEEK_API_KEY") or os.getenv("DEEPSEEK_API_KEY") == "your_d
 # ==========================================
 
 def init_metadata_table():
-    """Initializes the thread_metadata table in SQLite to store conversation titles."""
+    """Initializes the thread_metadata table and migrates schema if needed."""
     conn = sqlite3.connect("checkpoints.db")
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS thread_metadata (
-            thread_id TEXT PRIMARY KEY,
+            thread_id     TEXT PRIMARY KEY,
             first_message TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            timestamp     DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Migration: add user_id column for per-user thread isolation.
+    # Safe to call on existing DBs — the except branch handles the no-op case.
+    try:
+        cursor.execute("ALTER TABLE thread_metadata ADD COLUMN user_id TEXT")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
     conn.commit()
     conn.close()
 
@@ -50,12 +61,16 @@ def init_metadata_table():
 init_metadata_table()
 
 
-def get_existing_threads_with_titles():
-    """Returns a list of (thread_id, display_title) tuples ordered by most recent."""
+def get_existing_threads_with_titles(username: str):
+    """Returns (thread_id, display_title) tuples for `username`, most recent first."""
     try:
         conn = sqlite3.connect("checkpoints.db")
         cursor = conn.cursor()
-        cursor.execute("SELECT thread_id, first_message FROM thread_metadata ORDER BY timestamp DESC")
+        cursor.execute(
+            "SELECT thread_id, first_message FROM thread_metadata "
+            "WHERE user_id = ? ORDER BY timestamp DESC",
+            (username,),
+        )
         threads = [(row[0], row[1]) for row in cursor.fetchall()]
         conn.close()
         return threads
@@ -63,7 +78,7 @@ def get_existing_threads_with_titles():
         return []
 
 
-def save_thread_metadata(tid, first_msg):
+def save_thread_metadata(tid: str, first_msg: str, username: str) -> None:
     """Saves the first message of a thread as its display name (only once)."""
     try:
         conn = sqlite3.connect("checkpoints.db")
@@ -72,8 +87,9 @@ def save_thread_metadata(tid, first_msg):
         if not cursor.fetchone():
             clean_title = first_msg[:50] + ("..." if len(first_msg) > 50 else "")
             cursor.execute(
-                "INSERT OR REPLACE INTO thread_metadata (thread_id, first_message) VALUES (?, ?)",
-                (tid, clean_title),
+                "INSERT OR REPLACE INTO thread_metadata (thread_id, first_message, user_id) "
+                "VALUES (?, ?, ?)",
+                (tid, clean_title, username),
             )
             conn.commit()
         conn.close()
@@ -86,19 +102,29 @@ def save_thread_metadata(tid, first_msg):
 # ==========================================
 st.sidebar.title("SAP Warehouse Assistant")
 
+# --- User identity & logout ---
+st.sidebar.caption(f"Logged in as **{current_user}**")
+if st.sidebar.button("Logout", key="logout_btn", use_container_width=True):
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+    st.rerun()
+
+st.sidebar.divider()
+
+# --- New chat ---
 if st.sidebar.button("+ New Chat", use_container_width=True, type="primary"):
-    st.session_state.current_thread_id = f"thread-{uuid.uuid4().hex[:8]}"
+    st.session_state.current_thread_id = f"{current_user}::thread-{uuid.uuid4().hex[:8]}"
     st.rerun()
 
 st.sidebar.subheader("Recent Conversations")
 
-threads = get_existing_threads_with_titles()
+threads = get_existing_threads_with_titles(current_user)
 
 if "current_thread_id" not in st.session_state:
     if threads:
         st.session_state.current_thread_id = threads[0][0]
     else:
-        st.session_state.current_thread_id = f"thread-{uuid.uuid4().hex[:8]}"
+        st.session_state.current_thread_id = f"{current_user}::thread-{uuid.uuid4().hex[:8]}"
 
 if threads:
     for tid, title in threads:
@@ -165,7 +191,7 @@ for msg in saved_messages:
 user_query = st.chat_input("Ask about warehouse inventory, deliveries, orders, or picking tasks...")
 
 if user_query:
-    save_thread_metadata(thread_id, user_query)
+    save_thread_metadata(thread_id, user_query, current_user)
 
     with st.chat_message("user"):
         st.markdown(user_query)

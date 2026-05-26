@@ -7,7 +7,8 @@ An intelligent, conversational dashboard providing natural language access to SA
 ## ✨ Core Features
 
 *   **Natural Language SAP Queries**: Instant query access to stock levels, bin configurations, inbound freight, outbound orders, and picking status.
-*   **Chat History**: A sidebar for managing multiple conversation threads. The first user query is used as the conversation title.
+*   **User Authentication**: Secure signup and login with bcrypt-hashed passwords. Each user's session and conversation history is fully isolated.
+*   **Per-User Chat History**: A sidebar for managing multiple conversation threads, scoped to the logged-in user. The first query is used as the conversation title.
 *   **Tool Call Logs**: Expandable JSON payloads showing the real-time response from each SAP tool call.
 *   **Durable State Persistence**: Asynchronous SQLite checkpointing keeps conversation state across sessions.
 
@@ -32,6 +33,7 @@ The Cockpit is built on top of 7 asynchronous, read-only query tools:
 *   **Orchestration Framework**: LangGraph / LangChain (for graph execution and state checkpointing)
 *   **Language Model**: DeepSeek V4 via `langchain-deepseek`
 *   **Persistence Layer**: Async SQLite Checkpointer (`AsyncSqliteSaver`)
+*   **Authentication**: bcrypt password hashing, stored in SQLite alongside LangGraph checkpoints
 *   **Frontend**: Streamlit
 *   **Package Manager**: `uv`
 
@@ -41,19 +43,22 @@ The Cockpit is built on top of 7 asynchronous, read-only query tools:
 
 ```
 .
-├── my_agent/                 # Core Agent Package
+├── auth/                         # Application-level auth package
 │   ├── __init__.py
-│   ├── agent.py              # Compiled agent graph
+│   ├── db.py                     # User storage & bcrypt credential logic
+│   └── ui.py                     # Streamlit login / signup gate
+├── my_agent/                     # Core Agent Package
+│   ├── __init__.py
+│   ├── agent.py                  # Compiled LangGraph agent graph
 │   └── utils/
 │       ├── __init__.py
-│       ├── tools.py          # 7 read-only SAP tools
-│       ├── nodes.py          # Graph nodes
-│       └── state.py          # State TypedDict schema
-├── app.py                    # Streamlit UI
-├── .env                      # Environment variables (not committed)
+│       └── tools.py              # 7 read-only SAP tools
+├── app.py                        # Streamlit UI entry point
+├── checkpoints.db                # SQLite state (auto-created, not committed)
+├── .env                          # Environment variables (not committed)
 ├── .gitignore
-├── langgraph.json            # LangGraph CLI config
-├── pyproject.toml            # Project dependencies
+├── langgraph.json                # LangGraph CLI config
+├── pyproject.toml                # Project dependencies
 └── README.md
 ```
 
@@ -85,3 +90,5 @@ uv run streamlit run app.py
 ```
 
 Opens at `http://localhost:8501`.
+
+On first launch, create an account via the **Sign Up** tab. All subsequent visits will require login. Each user's conversation history is private and persists across sessions.
