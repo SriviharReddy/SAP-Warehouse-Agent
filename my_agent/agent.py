@@ -1,4 +1,3 @@
-import os
 from dotenv import load_dotenv
 from langchain.agents import create_agent
 from langchain_deepseek import ChatDeepSeek
@@ -42,5 +41,5 @@ def get_agent(checkpointer=None):
     return agent
 
 # Export a default graph for LangGraph CLI / Studio compatibility (uses memory saver by default)
-from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.memory import InMemorySaver  # noqa: E402
 graph = get_agent(checkpointer=InMemorySaver())
